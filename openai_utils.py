@@ -52,6 +52,10 @@ def llm_call_cost(response):
     """Returns the cost of the LLM call in dollars"""
     model = response.model
     usage = response.usage
+    
+    # 如果是本地模型，直接回傳 0
+    if model not in OPENAI_PRICING:
+        return 0.0
     prompt_cost = OPENAI_PRICING[model]["prompt"]
     completion_cost = OPENAI_PRICING[model]["completion"]
     prompt_token_cost = (usage.prompt_tokens * prompt_cost) / 1000
