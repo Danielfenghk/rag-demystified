@@ -1,7 +1,9 @@
-evadb[document]
-openai>=1.0
-instructor
-pydantic==2.4.0
-python-dotenv==1.0.0
-tiktoken
-tenacity
+openai>=1.0          # 用來呼叫 Ollama 的 OpenAI-compatible API
+instructor           # 用於 subquestion_generator 的 structured output (function calling)
+pydantic>=2.0        # instructor 和現代套件需要 pydantic v2
+python-dotenv==1.0.0 # 雖然已移除 .env，但保留相容性無害（或可刪除）
+tiktoken             # 用於 openai_utils 中的成本計算（雖然本地成本為 0，但保留功能）
+tenacity             # openai_utils 中的 retry 機制
+sentence-transformers  # 本地產生 embedding（取代 EvaDB 的 SentenceFeatureExtractor）
+faiss-cpu            # FAISS 向量索引與檢索（CPU 版，Windows 完全相容）
+# faiss-gpu          # 如果你有 NVIDIA GPU，可取消註解並改用此行

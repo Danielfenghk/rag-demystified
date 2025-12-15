@@ -1,5 +1,8 @@
+from sentence_transformers import SentenceTransformer
+import faiss
+import numpy as np
 import os
-from dotenv import load_dotenv
+##from dotenv import load_dotenv
 from pathlib import Path
 import requests
 
@@ -7,17 +10,62 @@ import warnings
 warnings.filterwarnings("ignore")
 
 from subquestion_generator import generate_subquestions
-import evadb
+#import evadb
 from openai_utils import llm_call
 
-
+'''
 if not load_dotenv():
     print(
         "Could not load .env file or it is empty. Please check if it exists and is readable."
     )
     exit(1)
+'''
+    # 本地 embedding 模型（與原專案相同）
+embedder = SentenceTransformer("all-mpnet-base-v2")
+dimension = 768
+indexes = {}  # {city_name: (faiss_index, sentences)}
+    
+def build_vector_stores(wiki_docs):
+    """使用 FAISS 建置向量索引"""
+    global indexes
+    for doc_name, text in wiki_docs.items():
+        print(f"Creating vector store for {doc_name}...")
+        # 按段落或句子分割
+        sentences = [line.strip() for line in text.split('\n') if line.strip()]
+        if len(sentences) == 0:
+            sentences = [text[i:i+500] for i in range(0, len(text), 500)]
+        
+        embeddings = embedder.encode(sentences, batch_size=32, show_progress_bar=False)
+        
+        index = faiss.IndexFlatL2(dimension)
+        index.add(np.array(embeddings).astype('float32'))
+        
+        indexes[doc_name] = (index, sentences)
+    print("All vector stores created successfully!")
 
+def vector_retrieval(llm_model, question, doc_name, top_k=3):
+    """向量檢索並呼叫 LLM"""
+    if doc_name not in indexes:
+        return "No information for this city.", 0
+    
+    index, sentences = indexes[doc_name]
+    q_emb = embedder.encode([question]).astype('float32')
+    
+    D, I = index.search(q_emb, top_k)
+    context = "\n".join([sentences[i] for i in I[0] if i >= 0])
+    
+    user_prompt = f"""You are an assistant for question-answering tasks.
+Use the following pieces of retrieved context to answer the question.
+If you don't know the answer, just say that you don't know.
+Use three sentences maximum and keep the answer concise.
+Question: {question}
+Context: {context}
+Answer:"""
 
+    response, cost = llm_call(model=llm_model, user_prompt=user_prompt)
+    answer = response.choices[0].message.content.strip()
+    return answer, cost
+    
 def generate_vector_stores(cursor, docs):
     """Generate a vector store for the docs using evadb.
     """
@@ -27,9 +75,9 @@ def generate_vector_stores(cursor, docs):
         cursor.query(f"LOAD DOCUMENT 'data/{doc}.txt' INTO {doc};").df()
         evadb_path = os.path.dirname(evadb.__file__)
         cursor.query(
-            f"""CREATE FUNCTION IF NOT EXISTS SentenceFeatureExtractor
+            f"""CREATE UDF IF NOT EXISTS SentenceFeatureExtractor
             IMPL  '{evadb_path}/functions/sentence_feature_extractor.py';
-            """).df()
+           """).df()
 
         cursor.query(
             f"""CREATE TABLE IF NOT EXISTS {doc}_features AS
@@ -106,7 +154,9 @@ def response_aggregator(llm_model, question, responses):
 
 
 def load_wiki_pages(page_titles=["Toronto", "Chicago", "Houston", "Boston", "Atlanta"]):
-
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    }
     # Download all wiki documents
     for title in page_titles:
         response = requests.get(
@@ -116,9 +166,11 @@ def load_wiki_pages(page_titles=["Toronto", "Chicago", "Houston", "Boston", "Atl
                 "format": "json",
                 "titles": title,
                 "prop": "extracts",
-                # 'exintro': True,
+                "exintro": True,
                 "explaintext": True,
             },
+            headers=headers,
+            timeout=30
         ).json()
         page = next(iter(response["query"]["pages"].values()))
         wiki_text = page["extract"]
@@ -141,9 +193,9 @@ def load_wiki_pages(page_titles=["Toronto", "Chicago", "Houston", "Boston", "Atl
 if __name__ == "__main__":
 
     # establish evadb api cursor
-    print("⏳ Connect to EvaDB...")
-    cursor = evadb.connect().cursor()
-    print("✅ Connected to EvaDB...")
+    #print("⏳ Connect to EvaDB...")
+    #cursor = evadb.connect().cursor()
+    #print("✅ Connected to EvaDB...")
 
     doc_names = ["Toronto", "Chicago", "Houston", "Boston", "Atlanta"]
     wiki_docs = load_wiki_pages(page_titles=doc_names)
@@ -153,9 +205,13 @@ if __name__ == "__main__":
     user_task = """We have a database of wikipedia articles about several cities.
                  We are building an application to answer questions about the cities."""
 
-    vector_stores = generate_vector_stores(cursor, wiki_docs)
+    ##vector_stores = generate_vector_stores(cursor, wiki_docs)
+    build_vector_stores(wiki_docs)  # 建置索引
+    
 
-    llm_model = "gpt-3.5-turbo"
+
+    #llm_model = "gpt-3.5-turbo"
+    llm_model = "deepseek-r1:8b"  # Instead of "gpt-3.5-turbo"
     total_cost = 0
     while True:
         question_cost = 0
@@ -176,8 +232,10 @@ if __name__ == "__main__":
             selected_doc = item.file_name.value
             print(f"\n-------> 🤔 Processing subquestion #{q_no+1}: {subquestion} | function: {selected_func} | data source: {selected_doc}")
             if selected_func == "vector_retrieval":
-                response, cost = vector_retrieval(cursor, llm_model, subquestion, selected_doc)
+                #response, cost = vector_retrieval(cursor, llm_model, subques1tion, selected_doc)
+                response, cost = vector_retrieval(llm_model, subquestion, selected_doc)
             elif selected_func == "llm_retrieval":
+                #response, cost = summary_retrieval(llm_model, subquestion, wiki_docs[selected_doc])
                 response, cost = summary_retrieval(llm_model, subquestion, wiki_docs[selected_doc])
             else:
                 print(f"\nCould not process subquestion: {subquestion} function: {selected_func} data source: {selected_doc}\n")

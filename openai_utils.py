@@ -3,7 +3,13 @@ import sys
 import logging
 
 from openai import OpenAI
-client = OpenAI()
+#client = OpenAI()
+
+client = OpenAI(
+    base_url="http://localhost:11434/v1",
+    api_key="ollama"  # Dummy key – required by the library but ignored by Ollama
+)
+
 import tiktoken
 
 from tenacity import (

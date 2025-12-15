@@ -47,7 +47,7 @@ def generate_subquestions(
     file_names: List[str] = None,
     system_prompt=DEFAULT_SUBQUESTION_GENERATOR_PROMPT,
     user_task=DEFAULT_USER_TASK,
-    llm_model="gpt-4-0613",
+    llm_model="deepseek-r1:8b",
 ):
     """Generates a list of subquestions from a user question along with the
     file name and the function to use to answer the question using OpenAI LLM.
