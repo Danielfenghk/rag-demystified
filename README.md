@@ -297,3 +297,100 @@ response = openai.ChatCompletion.create(
         ...
 )
 ``` -->
+
+### 不要再強行使用 EvaDB 了
+#EvaDB 在 Windows 上的相容性本來就差，加上版本落後、pydantic 衝突、UDF 檔案不存在等問題，會讓你一直卡在各種錯誤中。
+#最佳且最乾淨的解決方案：完全移除 EvaDB，改用純 Python + FAISS + sentence-transformers
+這是 2025 年絕大多數人跑本地 RAG 的標準做法，穩定、快速、完全相容 Windows，且不會破壞環境。
+pip install faiss-cpu sentence-transformers
+
+#EvaDB 的儲存引擎在處理多媒體/文件時，會嘗試建立 symbolic link 來避免複製檔案（節省空間）。
+在 Windows 上，建立 symlink 需要特殊權限（SeCreateSymbolicLinkPrivilege）
+
+###  當 deepseek-r1:8b 在 Ollama 上執行 function calling 時，它經常不嚴格遵守 JSON 格式，而是直接回普通文字答案
+Llama3.1 和 Qwen2.5 在 Ollama 上 function calling 幾乎 100% 成功
+ollama pull llama3.1:8b
+ollama pull qwen2.5:14b
+### 推薦最終選擇
+直接換成 llama3.1:8b — 這是 2025 年底最平衡的選擇：
+
+8B 參數，CPU 可輕鬆跑
+function calling 極其穩定
+推理能力接近 deepseek-r1:8b
+Meta 官方支援，Ollama 優化最好
+
+執行：
+Bashollama pull llama3.1:8b
+
+###最新修改推送到你的 GitHub fork 的完整命令（已驗證可正常運作）：
+Bash# 1. 確認目前 remote 正確（應該指向你的 fork）
+git remote -v
+
+# 如果輸出不是你的 fork，執行這行修正（只需一次）
+git remote set-url origin https://github.com/Danielfenghk/rag-demystified.git
+
+# 2. 添加所有修改檔案
+git add .
+
+# 3. 提交修改（寫一個清楚的 commit 訊息）
+git commit -m "Refactor for full Ollama support: remove EvaDB, use pure FAISS + sentence-transformers, robust subquestion generation"
+
+# 4. 推送到你的 GitHub fork 的 main 分支
+git push origin main
+
+
+#1. What are FAISS and Sentence-Transformers?
+FAISS (Facebook AI Similarity Search) is a library specifically built for efficient similarity search and clustering of dense vectors. Its core strength is speed and scalability when you need to find the closest vectors (e.g., the most similar text or images) in a massive dataset (billions of vectors). It uses advanced indexing techniques like IVF (Inverted File Index) and HNSW (Hierarchical Navigable Small World) to perform searches that are much faster than a brute-force comparison.
+
+Sentence-Transformers is a Python framework built on top of PyTorch and Hugging Face Transformers. Its purpose is to easily generate high-quality embeddings (dense vector representations) for sentences, paragraphs, and short documents. It provides pre-trained models (e.g., all-MiniLM-L6-v2) that convert text into a numerical vector (e.g., 384 dimensions) where semantically similar texts have vectors that are close together in the vector space.
+
+#2. What is EvaDB?
+EvaDB is a complete AI-centric database system. It's not just a vector search library; it's designed to bring AI/ML models directly into a database workflow. Think of it as PostgreSQL with superpowers for AI. Its key features are:
+
+SQL Interface for AI: You write SQL queries that call AI functions (e.g., SELECT ChatGPT(query, column) FROM table).
+
+Built-in Model Management: It can cache, optimize, and run various AI models (for vision, NLP, etc.).
+
+Vector Search as a Feature: It has built-in support for vector indexing (often using FAISS or similar backends internally) and similarity search, but this is one of many capabilities.
+
+Data Orchestration: It connects to multiple data sources (PostgreSQL, SQLite, CSVs, etc.) and manages the pipeline from raw data to AI inference.
+
+Why FAISS + Sentence-Transformers Can Feel Like a Replacement for EvaDB
+The combination is often positioned as an alternative specifically for building a vector search application for text. Here’s the logic:
+
+Aspect	FAISS + Sentence-Transformers	EvaDB
+Primary Goal	Specialized, high-performance vector search for text. A focused pipeline: text -> vector -> store -> search.	General-purpose AI database. Integrates AI models (of all types) directly into data management via SQL.
+Flexibility	Modular & DIY. You choose the embedding model, the index type, and manage the pipeline (chunking, ingestion, retrieval) yourself. High control for engineers.	Integrated & Declarative. You describe what you want (in SQL), and EvaDB handles the how. Less boilerplate code.
+Strength	Raw speed and scale for search. FAISS is industry-standard for maximum performance on pure vector search. You can fine-tune every parameter.	Developer productivity and simplicity for multi-model AI apps. Easy to chain multiple AI functions, filter by metadata, and connect to existing databases.
+Use Case Fit	Best when your core need is semantic search/retrieval at scale (e.g., building a RAG system's retrieval engine, a large-scale recommendation system).	Best when you need to quickly query data with various AI models (e.g., "find videos where a car appears and summarize the transcript," combining object detection and NLP).
+The Analogy:
+
+FAISS + Sentence-Transformers is like buying high-performance car parts (engine, transmission, suspension) and building a race car yourself. It's powerful and optimized for the track (search), but you have to assemble and maintain it.
+
+EvaDB is like buying a high-end, feature-rich SUV that has a great built-in navigation system, towing capacity, and a great sound system. It's very capable for many tasks (including off-road/on-road) and more convenient, but it might not be the absolute fastest on a racetrack.
+
+When You Might Choose One Over the Other
+Choose FAISS + Sentence-Transformers if:
+
+Vector search is your dominant, performance-critical need. You need the absolute lowest latency and highest recall for semantic search.
+
+You already have a dedicated engineering team comfortable managing the entire pipeline (data loading, embedding generation, index tuning, serving, and updates).
+
+Your application is primarily about retrieving relevant text/documents (like in RAG systems), and you don't need complex SQL-based AI chaining.
+
+Choose EvaDB if:
+
+You want to rapidly prototype or build an application that uses multiple AI functions (e.g., sentiment analysis + question answering + image classification) without writing extensive glue code.
+
+Your team is proficient in SQL and prefers a declarative approach to AI queries.
+
+Your use case involves complex filtering (e.g., "find documents from last week that are similar to this query and have a positive sentiment").
+
+You want a unified system to manage and cache AI models and connect directly to your existing operational databases.
+
+Conclusion
+FAISS + Sentence-Transformers doesn't fully "replace" EvaDB. Instead, it provides a more specialized, high-performance alternative for the vector search component that EvaDB also offers.
+
+If your project is a text-centric vector search engine, the DIY approach with FAISS + Sentence-Transformers is a classic, powerful, and scalable choice. If your project is a broader AI-powered data application where vector search is just one part of a larger workflow involving multiple models and data sources, EvaDB's integrated approach can save significant development time and complexity.
+
+In essence: They are tools for different layers of the stack. FAISS is an algorithmic library for a specific task, while EvaDB is a system for orchestrating multiple AI tasks.
