@@ -397,3 +397,131 @@ FAISS + Sentence-Transformers doesn't fully "replace" EvaDB. Instead, it provide
 If your project is a text-centric vector search engine, the DIY approach with FAISS + Sentence-Transformers is a classic, powerful, and scalable choice. If your project is a broader AI-powered data application where vector search is just one part of a larger workflow involving multiple models and data sources, EvaDB's integrated approach can save significant development time and complexity.
 
 In essence: They are tools for different layers of the stack. FAISS is an algorithmic library for a specific task, while EvaDB is a system for orchestrating multiple AI tasks.
+
+Workflow Overview: complex_qa_ollama_refactored.py
+The refactored script is designed to be 100% compatible with Ollama by removing OpenAI-specific features like function calling and Pydantic schemas. It follows a classic RAG (Retrieval-Augmented Generation) pattern, broken down into two main phases: Initialization (Building Vector Stores) and Execution (The Question-Answering Loop).
+
+Mermaid Workflow Diagram
+```mermaid
+flowchart TD
+    %% Phase 1: Initialization
+    subgraph Initialization ["Phase 1: Knowledge Base Setup"]
+        Start([Start Script]) --> LoadWiki[load_wiki_pages: Fetch content from Wikipedia API]
+        LoadWiki --> DataDir[(Save .txt files to /data)]
+        DataDir --> BuildStores[build_vector_stores: Split text into sentences]
+        BuildStores --> Embed[Generate Embeddings via SentenceTransformer]
+        Embed --> FAISS[(Add to FAISS Indexes per document)]
+    end
+
+    %% Phase 2: Execution Loop
+    subgraph Execution ["Phase 2: QA Loop"]
+        UserInput[/User enters complex question/] --> GenSub[generate_subquestions_ollama: LLM breaks down query]
+        
+        subgraph SubProc ["Sub-question Processing (Loop)"]
+            direction LR
+            GetSub[Iterate through JSON list of sub-questions] --> Ret[vector_retrieval: Search relevant FAISS index]
+            Ret --> LLMAns[llm_call: Generate sub-answer from context]
+        end
+        
+        GenSub --> GetSub
+        LLMAns --> Collect[Aggregate all sub-answers & costs]
+        Collect --> FinalAns[Synthesize final response to user]
+        FinalAns --> UserInput
+    end
+
+    %% Exit Logic
+    UserInput -.-> |"type 'exit'"| End([End Script])
+
+    %% Styling
+    style Initialization fill:#f9f,stroke:#333,stroke-width:2px
+    style Execution fill:#bbf,stroke:#333,stroke-width:2px
+    style SubProc fill:#fff,stroke:#333,stroke-dasharray: 5 5
+```
+Key Components Explained:
+# 1 Initialization Phase: The script first fetches data for specific cities (e.g., Toronto, Chicago) and builds local vector stores using FAISS and SentenceTransformer (all-mpnet-base-v2).
+
+# 2 Sub-question Generation: Unlike the original script, this version uses a plain-text JSON prompt to ask the LLM (specifically deepseek-r1:8b) to break the question down, providing a robust fallback if the model fails to return valid JSON.
+
+# 3 Vector Retrieval: For each sub-question, the script identifies the target file/index and performs a similarity search to find the most relevant context sentences.
+
+# 4 Synthesis: Finally, it combines the individual sub-answers into one cohesive response for the user.
+
+
+### how the data moves from raw Wikipedia text into the specialized SubQuestionQueryEngine
+```mermaid
+graph TD
+    subgraph Initialization
+        A[Start Script] --> B[Configure Settings]
+        B --> B1[LLM: Ollama/DeepSeek]
+        B --> B2[Embed: HuggingFace/mpnet]
+        B --> B3[Callback: TokenCounter]
+    end
+
+    subgraph Data_Ingestion["Data Ingestion & Indexing"]
+        C[Download Wiki Content] --> D[SimpleDirectoryReader]
+        D --> E{For each City...}
+        E --> F[VectorStoreIndex]
+        E --> G[SummaryIndex]
+    end
+
+    subgraph Tool_Creation["Tool Mapping"]
+        F --> H[VectorTool: Specific Facts]
+        G --> I[SummaryTool: Holistic Info]
+        H & I --> J[QueryEngineTool List]
+    end
+
+    subgraph Execution["Query Execution"]
+        K[User Question] --> L[SubQuestionQueryEngine]
+        J --> L
+        L --> M[LLM analyzes question]
+        M --> N[Breakdown into Sub-Questions]
+        
+        subgraph Sub_Queries["Recursive Retrieval"]
+            N --> O1[Sub-Q 1 -> Vector/Summary Tool]
+            N --> O2[Sub-Q 2 -> Vector/Summary Tool]
+        end
+        
+        O1 & O2 --> P[Response Synthesizer]
+        P --> Q[Final Consolidated Answer]
+    end
+
+    Q --> R[Print Token Usage Statistics]
+```
+
+
+### detailed sequence showing exactly how your local DeepSeek model and FAISS vector store interact when you ask a complex questiondetailed sequence showing exactly how your local DeepSeek model and FAISS vector store interact when you ask a complex question
+```mermaid
+sequenceDiagram
+    participant User
+    participant SQQE as SubQuestionQueryEngine
+    participant LLM as LLM (DeepSeek-R1)
+    participant VS as Vector Store (FAISS)
+    participant Syn as Response Synthesizer
+
+    User->>SQQE: "Which are the sports teams in Toronto?"
+    
+    Note over SQQE,LLM: --- Planning Phase ---
+    SQQE->>LLM: Send Query + Tool Metadata (Names/Descriptions)
+    LLM-->>LLM: <think> Reasoning: Need specific facts about Toronto.
+    LLM->>SQQE: Return JSON: [{"sub_q": "What are the major sports teams in Toronto?", "tool": "vector_tool_Toronto"}]
+
+    Note over SQQE,VS: --- Execution Phase ---
+    SQQE->>VS: Execute Sub-Query on 'vector_tool_Toronto'
+    VS->>VS: Embed Sub-Query -> Search Top-K Chunks
+    VS-->>SQQE: Return relevant text (Raptors, Blue Jays, Maple Leafs...)
+
+    Note over SQQE,Syn: --- Synthesis Phase ---
+    SQQE->>Syn: Pass (Original Query + Sub-Questions + Retrieved Answers)
+    Syn->>LLM: Final Prompt: "Consolidate these findings into a clear answer."
+    LLM-->>Syn: Final Answer Text
+    Syn->>User: "The sports teams in Toronto include the Raptors (NBA), Blue Jays (MLB)..."
+```
+
+# 1 Deep Dive: What's happening in each step?
+Metadata Handshake: The SQQE doesn't send the documents to the LLM during planning. It only sends the ToolMetadata (the names and descriptions you defined in your code). This is why descriptive names like vector_tool_Toronto are critical.
+
+# 2 JSON Generation: The LLM acts as a "Router." It identifies which tool is best equipped to answer the specific part of the query. In your error earlier, this is where the memory spiked—generating this plan requires the model to "reason" over all 10 tools.
+
+# 3 Local Retrieval: The SQQE then calls the query() method of the specific VectorStoreIndex. This happens locally on your CPU/GPU using FAISS and does not involve the LLM until the final step.
+
+# 4 Consolidation: The ResponseSynthesizer (using the compact mode in your code) takes the raw data found in the vector store and the original question, then asks the LLM to format it into a human-readable response.
