@@ -140,7 +140,23 @@ def generate_subquestions(
         few_shot_examples=few_shot_examples,
     )
 
-    subquestions_list = json.loads(response.choices[0].message.function_call.arguments)
+    #subquestions_list = json.loads(response.choices[0].message.function_call.arguments)
+    message = response.choices[0].message
+
+    # 安全檢查：如果沒有 function_call，就用內容當 fallback
+    if hasattr(message, "function_call") and message.function_call is not None:
+        args = message.function_call.arguments
+        print("✅ Structured subquestions generated successfully.")
+    else:
+        print("⚠️ Model returned plain text instead of function call. Using fallback parsing...")
+        args = message.content  # fallback 到普通文字
+
+    try:
+        subquestions_list = json.loads(args)
+    except json.JSONDecodeError:
+        print("JSON parse failed, raw response:")
+        print(args)
+        raise
 
     subquestions_pydantic_obj = SubQuestionBundleList(**subquestions_list)
     subquestions_list = subquestions_pydantic_obj.subquestion_bundle_list

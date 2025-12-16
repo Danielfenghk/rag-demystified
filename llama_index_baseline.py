@@ -40,7 +40,7 @@ elif embed_model_name == "text-embedding-ada-002":
         api_type=api_type,
         api_version=api_version,
     )
-
+'''
 llm = AzureOpenAI(
     model="gpt-3.5-turbo",
     engine="gpt-35-turbo",
@@ -49,7 +49,10 @@ llm = AzureOpenAI(
     api_type=api_type,
     api_version=api_version,
 )
+'''
+from llama_index.llms.ollama import Ollama
 
+llm = Ollama(model="deepseek-r1:8b", base_url="http://localhost:11434")
 token_counter = TokenCountingHandler(
     tokenizer=tiktoken.encoding_for_model("gpt-3.5-turbo").encode
 )
