@@ -314,13 +314,16 @@ ollama pull qwen2.5:14b
 ### 推薦最終選擇
 直接換成 llama3.1:8b — 這是 2025 年底最平衡的選擇：
 
-8B 參數，CPU 可輕鬆跑
+8B 參數，
+CPU 可輕鬆跑
 function calling 極其穩定
 推理能力接近 deepseek-r1:8b
-Meta 官方支援，Ollama 優化最好
+Meta 官方支援，
+Ollama 優化最好
 
 執行：
-Bashollama pull llama3.1:8b
+Bash
+ollama pull llama3.1:8b
 
 ###最新修改推送到你的 GitHub fork 的完整命令（已驗證可正常運作）：
 Bash# 1. 確認目前 remote 正確（應該指向你的 fork）
@@ -339,21 +342,21 @@ git commit -m "Refactor for full Ollama support: remove EvaDB, use pure FAISS + 
 git push origin main
 
 
-#1. What are FAISS and Sentence-Transformers?
+# 1. What are FAISS and Sentence-Transformers?
 FAISS (Facebook AI Similarity Search) is a library specifically built for efficient similarity search and clustering of dense vectors. Its core strength is speed and scalability when you need to find the closest vectors (e.g., the most similar text or images) in a massive dataset (billions of vectors). It uses advanced indexing techniques like IVF (Inverted File Index) and HNSW (Hierarchical Navigable Small World) to perform searches that are much faster than a brute-force comparison.
 
 Sentence-Transformers is a Python framework built on top of PyTorch and Hugging Face Transformers. Its purpose is to easily generate high-quality embeddings (dense vector representations) for sentences, paragraphs, and short documents. It provides pre-trained models (e.g., all-MiniLM-L6-v2) that convert text into a numerical vector (e.g., 384 dimensions) where semantically similar texts have vectors that are close together in the vector space.
 
-#2. What is EvaDB?
+# 2. What is EvaDB?
 EvaDB is a complete AI-centric database system. It's not just a vector search library; it's designed to bring AI/ML models directly into a database workflow. Think of it as PostgreSQL with superpowers for AI. Its key features are:
 
-SQL Interface for AI: You write SQL queries that call AI functions (e.g., SELECT ChatGPT(query, column) FROM table).
+## SQL Interface for AI: You write SQL queries that call AI functions (e.g., SELECT ChatGPT(query, column) FROM table).
 
-Built-in Model Management: It can cache, optimize, and run various AI models (for vision, NLP, etc.).
+## Built-in Model Management: It can cache, optimize, and run various AI models (for vision, NLP, etc.).
 
-Vector Search as a Feature: It has built-in support for vector indexing (often using FAISS or similar backends internally) and similarity search, but this is one of many capabilities.
+## Vector Search as a Feature: It has built-in support for vector indexing (often using FAISS or similar backends internally) and similarity search, but this is one of many capabilities.
 
-Data Orchestration: It connects to multiple data sources (PostgreSQL, SQLite, CSVs, etc.) and manages the pipeline from raw data to AI inference.
+## Data Orchestration: It connects to multiple data sources (PostgreSQL, SQLite, CSVs, etc.) and manages the pipeline from raw data to AI inference.
 
 Why FAISS + Sentence-Transformers Can Feel Like a Replacement for EvaDB
 The combination is often positioned as an alternative specifically for building a vector search application for text. Here’s the logic:
