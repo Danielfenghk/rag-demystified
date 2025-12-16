@@ -7,3 +7,10 @@ tenacity             # openai_utils 中的 retry 機制
 sentence-transformers  # 本地產生 embedding（取代 EvaDB 的 SentenceFeatureExtractor）
 faiss-cpu            # FAISS 向量索引與檢索（CPU 版，Windows 完全相容）
 # faiss-gpu          # 如果你有 NVIDIA GPU，可取消註解並改用此行
+numpy
+# LlamaIndex v0.10+ Modular Packages
+llama-index-core 
+llama-index-readers-file 
+llama-index-llms-ollama 
+llama-index-embeddings-huggingface 
+llama-index-question-gen-openai

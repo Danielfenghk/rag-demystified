@@ -64,7 +64,7 @@ service_context = ServiceContext.from_defaults(
     llm=llm,
     callback_manager=callback_manager,
     embed_model=embed_model,
-)
+)fully refactored version of your llama_index_baseline.pyfully refactored version of your llama_index_baseline.py
 
 
 def print_token_count(token_counter, embed_model, model="gpt-35-turbo"):
