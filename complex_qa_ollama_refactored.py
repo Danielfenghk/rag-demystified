@@ -96,10 +96,10 @@ JSON format:
 
 User question: {question}
 """
-
+    print("\n prompt in subquestions is {}", prompt)
     response, _ = llm_call(model=llm_model, user_prompt=prompt)
     raw = response.choices[0].message.content.strip()
-
+    print(response)
     try:
         data = json.loads(raw)
         return data.get("subquestions", [])
@@ -129,8 +129,9 @@ Information:
 {context}
 Answer:
 """
-
+    print("\n prompt in aggregate_answers is {}", prompt)
     response, cost = llm_call(model=llm_model, user_prompt=prompt)
+    print(response)
     return response.choices[0].message.content.strip(), cost
 
 
