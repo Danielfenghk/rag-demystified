@@ -4,11 +4,7 @@ Retrieval-Augmented Generation (RAG) pipelines powered by large language models 
 
 In this [EvaDB](https://github.com/georgia-tech-db/evadb) application, we'll shed light on the inner workings of advanced RAG pipelines by examining the mechanics, limitations, and costs that often remain opaque.
 
-<p align="center">
-  <img width="70%" src="images/intro.png" title="llama working on a laptop to retrieve data" >
-  <br>
-  <b><i>Llama working on a laptop</i> 🙂</b>
-</p>
+
 
 ## Quick start
 
@@ -298,47 +294,48 @@ response = openai.ChatCompletion.create(
 )
 ``` -->
 
-### 不要再強行使用 EvaDB 了
-#EvaDB 在 Windows 上的相容性本來就差，加上版本落後、pydantic 衝突、UDF 檔案不存在等問題，會讓你一直卡在各種錯誤中。
+## 不要再強行使用 EvaDB 了
+- EvaDB 在 Windows 上的相容性本來就差，加上版本落後、pydantic 衝突、UDF 檔案不存在等問題，會讓你一直卡在各種錯誤中。
 #最佳且最乾淨的解決方案：完全移除 EvaDB，改用純 Python + FAISS + sentence-transformers
 這是 2025 年絕大多數人跑本地 RAG 的標準做法，穩定、快速、完全相容 Windows，且不會破壞環境。
 pip install faiss-cpu sentence-transformers
 
-#EvaDB 的儲存引擎在處理多媒體/文件時，會嘗試建立 symbolic link 來避免複製檔案（節省空間）。
+- EvaDB 的儲存引擎在處理多媒體/文件時，會嘗試建立 symbolic link 來避免複製檔案（節省空間）。
 在 Windows 上，建立 symlink 需要特殊權限（SeCreateSymbolicLinkPrivilege）
 
-###  當 deepseek-r1:8b 在 Ollama 上執行 function calling 時，它經常不嚴格遵守 JSON 格式，而是直接回普通文字答案
-Llama3.1 和 Qwen2.5 在 Ollama 上 function calling 幾乎 100% 成功
-ollama pull llama3.1:8b
-ollama pull qwen2.5:14b
+##  當 deepseek-r1:8b 在 Ollama 上執行 function calling 時，它經常不嚴格遵守 JSON 格式，而是直接回普通文字答案
+- Llama3.1 和 Qwen2.5 在 Ollama 上 function calling 幾乎 100% 成功
+- ollama pull llama3.1:8b
+- ollama pull qwen2.5:14b
 ### 推薦最終選擇
 直接換成 llama3.1:8b — 這是 2025 年底最平衡的選擇：
 
-8B 參數，
-CPU 可輕鬆跑
-function calling 極其穩定
-推理能力接近 deepseek-r1:8b
-Meta 官方支援，
-Ollama 優化最好
+- 8B 參數，
+- CPU 可輕鬆跑
+- function calling 極其穩定
+- 推理能力接近 deepseek-r1:8b
+- Meta 官方支援，
+- Ollama 優化最好
 
 執行：
 Bash
-ollama pull llama3.1:8b
+- ollama pull llama3.1:8b
 
 ###最新修改推送到你的 GitHub fork 的完整命令（已驗證可正常運作）：
-Bash# 1. 確認目前 remote 正確（應該指向你的 fork）
+Bash# 
+- 1. 確認目前 remote 正確（應該指向你的 fork）
 git remote -v
 
-# 如果輸出不是你的 fork，執行這行修正（只需一次）
+> 如果輸出不是你的 fork，執行這行修正（只需一次）
 git remote set-url origin https://github.com/Danielfenghk/rag-demystified.git
 
-# 2. 添加所有修改檔案
+- 2. 添加所有修改檔案
 git add .
 
-# 3. 提交修改（寫一個清楚的 commit 訊息）
+-  3. 提交修改（寫一個清楚的 commit 訊息）
 git commit -m "Refactor for full Ollama support: remove EvaDB, use pure FAISS + sentence-transformers, robust subquestion generation"
 
-# 4. 推送到你的 GitHub fork 的 main 分支
+-  4. 推送到你的 GitHub fork 的 main 分支
 git push origin main
 
 
@@ -438,16 +435,97 @@ flowchart TD
     style SubProc fill:#fff,stroke:#333,stroke-dasharray: 5 5
 ```
 Key Components Explained:
-# 1 Initialization Phase: The script first fetches data for specific cities (e.g., Toronto, Chicago) and builds local vector stores using FAISS and SentenceTransformer (all-mpnet-base-v2).
+- 1 Initialization Phase: The script first fetches data for specific cities (e.g., Toronto, Chicago) and builds local vector stores using FAISS and SentenceTransformer (all-mpnet-base-v2).
 
-# 2 Sub-question Generation: Unlike the original script, this version uses a plain-text JSON prompt to ask the LLM (specifically deepseek-r1:8b) to break the question down, providing a robust fallback if the model fails to return valid JSON.
+-2 Sub-question Generation: Unlike the original script, this version uses a plain-text JSON prompt to ask the LLM (specifically deepseek-r1:8b) to break the question down, providing a robust fallback if the model fails to return valid JSON.
 
-# 3 Vector Retrieval: For each sub-question, the script identifies the target file/index and performs a similarity search to find the most relevant context sentences.
+- 3 Vector Retrieval: For each sub-question, the script identifies the target file/index and performs a similarity search to find the most relevant context sentences.
 
-# 4 Synthesis: Finally, it combines the individual sub-answers into one cohesive response for the user.
+- 4 Synthesis: Finally, it combines the individual sub-answers into one cohesive response for the user.
+
+1. Sequence Diagram
+The sequence diagram details the runtime execution flow, starting from data ingestion through the interactive Q&A loop.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant Main as Main Execution Loop
+    participant Wiki as Wikipedia API
+    participant Vector as Vector Store (FAISS)
+    participant LLM as Ollama (DeepSeek-R1)
+
+    Note over Main, Wiki: Initialization Phase
+    Main->>Wiki: load_wiki_pages(titles)
+    Wiki-->>Main: Returns document extracts
+    Main->>Vector: build_vector_stores(docs)
+    Vector->>Vector: Generate embeddings & populate FAISS
+
+    loop Question-Answering Loop
+        User->>Main: Asks complex question
+        Main->>LLM: generate_subquestions_ollama(question)
+        LLM-->>Main: Returns JSON subquestions list
+        
+        loop For each subquestion
+            Main->>Vector: vector_retrieval(subquestion, file)
+            Vector->>Vector: Similarity Search (top_k)
+            Vector->>LLM: Request sub-answer with context
+            LLM-->>Vector: Returns specific answer
+            Vector-->>Main: Returns sub-answer & cost
+        end
+
+        Main->>LLM: aggregate_answers(all sub-answers)
+        LLM-->>Main: Returns final synthesized response
+        Main->>User: Displays Final Answer & Total Cost
+    end
+```
+2. Class Diagram
+While the refactored script is written in a functional style, this diagram represents the logical relationships between data structures, primary functions, and external dependencies.
+
+```
+classDiagram
+    class GlobalState {
+        +dict indexes
+        +SentenceTransformer embedder
+        +int dimension
+    }
+
+    class WikipediaLoader {
+        +load_wiki_pages(page_titles) dict
+    }
+
+    class VectorManager {
+        +build_vector_stores(wiki_docs)
+        +vector_retrieval(model, question, doc_name) str
+    }
+
+    class LLMProcessor {
+        +generate_subquestions_ollama(question, docs, model) list
+        +aggregate_answers(model, question, answers) str
+    }
+
+    class ExternalDependencies {
+        <<Service>>
+        +Ollama (LLM)
+        +FAISS (Index)
+        +SentenceTransformer (Embeddings)
+    }
+
+    GlobalState ..> VectorManager : provides indexes
+    WikipediaLoader --> VectorManager : feeds text data
+    VectorManager --> ExternalDependencies : uses FAISS/Embedder
+    LLMProcessor --> ExternalDependencies : uses Ollama
+    VectorManager ..> LLMProcessor : retrieval feeds generation
+```
+Key Logic Summary:
+Initialization: The script first fetches text from Wikipedia for specific cities and prepares local FAISS indexes using all-mpnet-base-v2 embeddings.
+
+Decomposition: It uses a prompt-based approach to force the Ollama model to return valid JSON containing sub-questions and their target files.
+
+Retrieval & Synthesis: It iterates through sub-questions, performs local similarity searches, and finally aggregates all findings into a single user response.
 
 
-### how the data moves from raw Wikipedia text into the specialized SubQuestionQueryEngine
+how the data moves from raw Wikipedia text into the specialized SubQuestionQueryEngine
 ```mermaid
 graph TD
     subgraph Initialization
@@ -489,7 +567,7 @@ graph TD
 ```
 
 
-### detailed sequence showing exactly how your local DeepSeek model and FAISS vector store interact when you ask a complex questiondetailed sequence showing exactly how your local DeepSeek model and FAISS vector store interact when you ask a complex question
+ Detailed sequence showing exactly how your local DeepSeek model and FAISS vector store interact when you ask a complex questiondetailed sequence showing exactly how your local DeepSeek model and FAISS vector store interact when you ask a complex question
 ```mermaid
 sequenceDiagram
     participant User
@@ -517,11 +595,11 @@ sequenceDiagram
     Syn->>User: "The sports teams in Toronto include the Raptors (NBA), Blue Jays (MLB)..."
 ```
 
-# 1 Deep Dive: What's happening in each step?
+- 1 Deep Dive: What's happening in each step?
 Metadata Handshake: The SQQE doesn't send the documents to the LLM during planning. It only sends the ToolMetadata (the names and descriptions you defined in your code). This is why descriptive names like vector_tool_Toronto are critical.
 
-# 2 JSON Generation: The LLM acts as a "Router." It identifies which tool is best equipped to answer the specific part of the query. In your error earlier, this is where the memory spiked—generating this plan requires the model to "reason" over all 10 tools.
+- 2 JSON Generation: The LLM acts as a "Router." It identifies which tool is best equipped to answer the specific part of the query. In your error earlier, this is where the memory spiked—generating this plan requires the model to "reason" over all 10 tools.
 
-# 3 Local Retrieval: The SQQE then calls the query() method of the specific VectorStoreIndex. This happens locally on your CPU/GPU using FAISS and does not involve the LLM until the final step.
+- 3 Local Retrieval: The SQQE then calls the query() method of the specific VectorStoreIndex. This happens locally on your CPU/GPU using FAISS and does not involve the LLM until the final step.
 
-# 4 Consolidation: The ResponseSynthesizer (using the compact mode in your code) takes the raw data found in the vector store and the original question, then asks the LLM to format it into a human-readable response.
+- 4 Consolidation: The ResponseSynthesizer (using the compact mode in your code) takes the raw data found in the vector store and the original question, then asks the LLM to format it into a human-readable response.
